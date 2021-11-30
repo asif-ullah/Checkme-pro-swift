@@ -1,0 +1,6 @@
+framework module Pods_CheckMeDeviceIntegration_CheckMeDeviceIntegrationUITests {
+  umbrella header "Pods-CheckMeDeviceIntegration-CheckMeDeviceIntegrationUITests-umbrella.h"
+
+  export *
+  module * { export * }
+}
