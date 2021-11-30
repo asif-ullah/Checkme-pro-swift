@@ -27,7 +27,8 @@ class DataListView : UIViewController, VTProCommunicateDelegate{
     var model_ : NSObject? = nil
     var str = ""
     var user: NSObject? = nil
-
+    var isSingleUser = false
+    
     override func viewDidLoad() {
         dataList = NSMutableArray.init(capacity: 10)
         for _ in 0..<userList.count {
@@ -35,36 +36,34 @@ class DataListView : UIViewController, VTProCommunicateDelegate{
             dataList.add(list)
             print(dataList)
             i = +1
-        
+            
         }
         tblList.tableFooterView = UIView(frame: CGRect.zero)
         VTProCommunicate.sharedInstance().delegate = self
         index = 0
-        downloadList(index)
+        if dataType == 4 || dataType == 5 || dataType == 8 || dataType == 9 {
+            isSingleUser = true
+            VTProCommunicate.sharedInstance().beginReadFileList(with: nil, fileType: dataTypeMapToFileType())
+        }else{
+            downloadList(index)
+        }
         super.viewDidLoad()
     }
-   
+    
     override func viewWillDisappear(_ animated: Bool) {
         // SVProgressHUD.dismiss()
         super.viewWillDisappear(true)
     }
-   
-//    func setUserList(_ userList: [NSArray]?) {
-//        self.userList = userList as! [VTProUser]
-//        for i in 0..<(userList?.count ?? 0) {
-//            let list = VTDataList()
-//            dataList.add(list)
-//        }
-//    }
+    
     func downloadList(_ index: Int) {
         self.index = index
-        if index == userList.count  {
+        if index == userList.count {
             self.index = 0
             tblList.reloadData()
             return
         }
-        user = userList[self.index] as! NSObject
-        VTProCommunicate.sharedInstance().beginReadFileList(with: nil, fileType: VTProFileTypeUserList)
+        user = userList[self.index] as! VTProUser
+        VTProCommunicate.sharedInstance().beginReadFileList(with: user as! VTProUser, fileType: dataTypeMapToFileType())
     }
     func dataTypeMapToFileType() -> VTProFileType {
         switch dataType {
@@ -88,8 +87,8 @@ class DataListView : UIViewController, VTProCommunicateDelegate{
             return VTProFileTypeSpcList
         default:
             break
-    }
-    return VTProFileTypeNone
+        }
+        return VTProFileTypeNone
     }
     func readComplete(withData fileData: VTProFileToRead) {
         if fileData.fileType == VTProFileTypeDlcList{
@@ -123,7 +122,7 @@ class DataListView : UIViewController, VTProCommunicateDelegate{
                 let arr = VTProFileParser.parseNIBPList_(withFileData: fileData.fileData as Data)
                 let list = dataList[index] as! VTDataList
                 list.list.addObjects(from: arr!)
-                list.list.replaceObject(at: index, with: list)
+                dataList.replaceObject(at: index, with: list)
                 print(arr)
             }
             index += 1
@@ -143,7 +142,7 @@ class DataListView : UIViewController, VTProCommunicateDelegate{
                 dataList.add(arr!)
                 tblList.reloadData()
             } else {
-               print("Error %ld",fileData.enLoadResult)
+                print("Error %ld",fileData.enLoadResult)
             }
         }else if (fileData.fileType) == VTProFileTypeSlmList {
             if fileData.enLoadResult == VTProFileLoadResultSuccess {
@@ -193,62 +192,61 @@ class DataListView : UIViewController, VTProCommunicateDelegate{
 
 extension DataListView : UITableViewDelegate , UITableViewDataSource{
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        if (userList != nil) {
+        if (!isSingleUser) {
             let list = dataList[section] as? VTDataList
             if list?.isExpand == true {
                 return list?.list.count ?? 0
             } else {
                 return 0
             }
-         }
+        }
         return dataList.count
         
     }
     func numberOfSections(in tableView: UITableView) -> Int {
-        if userList != nil{
+        if !isSingleUser{
             return userList.count ?? 0
         }else{
             return 1
         }
     }
-
+    
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        print("lkjf")
-      let identifier = "dataListCell"
-      var cell = tableView.dequeueReusableCell(withIdentifier: identifier)
-      if cell == nil {
-          cell = UITableViewCell(style: .default, reuseIdentifier: identifier)
-      }
-      var str = ""
-      if userList != nil {
-          let list = dataList[indexPath.section] as! VTDataList
-          model_ = list.list[indexPath.row] as? NSObject
-          str = "\t"
-       } else {
-
-           model_ = dataList[indexPath.row] as? NSObject
-       }
-
+        let identifier = "dataListCell"
+        var cell = tableView.dequeueReusableCell(withIdentifier: identifier)
+        if cell == nil {
+            cell = UITableViewCell(style: .default, reuseIdentifier: identifier)
+        }
+        var str = ""
+        if !isSingleUser {
+            let list = dataList[indexPath.section] as! VTDataList
+            model_ = list.list[indexPath.row] as? NSObject
+            str = "\t"
+        } else {
+            
+            model_ = dataList[indexPath.row] as? NSObject
+        }
+        
         let dc = model_?.value(forKey: "dtcDate") as? DateComponents
-
-       if self.dataTypeMapToFileType() == VTProFileTypeDlcList || dataTypeMapToFileType() == VTProFileTypeEcgList || dataTypeMapToFileType() == VTProFileTypeSlmList {
-           cell?.accessoryType = .disclosureIndicator
-       } else {
-           cell?.accessoryType = .none
-       }
-           cell?.textLabel?.text = String(format: "%@%ld-%02ld-%02ld %02ld:%02ld:%02ld", str, Int(dc?.year ?? 0), Int(dc?.month ?? 0), Int(dc?.day ?? 0), Int(dc?.hour ?? 0), Int(dc?.minute ?? 0), Int(dc?.second ?? 0))
-           return cell!
+        
+        if self.dataTypeMapToFileType() == VTProFileTypeDlcList || dataTypeMapToFileType() == VTProFileTypeEcgList || dataTypeMapToFileType() == VTProFileTypeSlmList {
+            cell?.accessoryType = .disclosureIndicator
+        } else {
+            cell?.accessoryType = .none
+        }
+        cell?.textLabel?.text = String(format: "%@%ld-%02ld-%02ld %02ld:%02ld:%02ld", str, Int(dc?.year ?? 0), Int(dc?.month ?? 0), Int(dc?.day ?? 0), Int(dc?.hour ?? 0), Int(dc?.minute ?? 0), Int(dc?.second ?? 0))
+        return cell!
     }
     
-   
+    
     func tableView(_ tableView: UITableView, estimatedHeightForRowAt indexPath: IndexPath) -> CGFloat {
-       return UITableView.automaticDimension
+        return UITableView.automaticDimension
     }
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-       return UITableView.automaticDimension
+        return UITableView.automaticDimension
     }
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        if userList != nil {
+        if !isSingleUser {
             let list = dataList[indexPath.row] as! VTDataList
             model_ = list.list[indexPath.row] as? NSObject
         } else {
@@ -260,25 +258,27 @@ extension DataListView : UITableViewDelegate , UITableViewDataSource{
         } else if dataTypeMapToFileType() == VTProFileTypeSlmList {
             let slm = model_ as? VTProSlm
             VTProCommunicate.sharedInstance().beginReadDetailFile(with: slm!, fileType: VTProFileTypeSlmDetail)
-
+            
         }else{
             return
         }
         
-     }
+    }
     func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
         let headerView = UIView(frame: CGRect(x: 0, y: 0, width: UIScreen.main.bounds.size.width, height: 40))
-               headerView.backgroundColor = UIColor.systemGroupedBackground
-               headerView.tag = section
-               let lab = UILabel(frame: CGRect(x: 16, y: 5, width: 300, height: 30))
-               lab.font = UIFont.boldSystemFont(ofSize: 20)
-               lab.text = (userList[section] as AnyObject).userName
-               headerView.addSubview(lab)
-               let tab_ = UITapGestureRecognizer(target: self, action: #selector(self.tapExpand(_:)))
-               headerView.addGestureRecognizer(tab_)
-               return headerView
+        headerView.backgroundColor = UIColor.systemGroupedBackground
+        headerView.tag = section
+        let lab = UILabel(frame: CGRect(x: 16, y: 5, width: 300, height: 30))
+        lab.font = UIFont.boldSystemFont(ofSize: 20)
+        if !isSingleUser {
+            lab.text = (userList[section] as AnyObject).userName
+        }
+        headerView.addSubview(lab)
+        let tab_ = UITapGestureRecognizer(target: self, action: #selector(self.tapExpand(_:)))
+        headerView.addGestureRecognizer(tab_)
+        return headerView
     }
-
+    
     @objc func tapExpand(_ sender: UITapGestureRecognizer) {
         let section = sender.view!.tag
         let list = dataList[section] as! VTDataList
@@ -286,7 +286,7 @@ extension DataListView : UITableViewDelegate , UITableViewDataSource{
         dataList.replaceObject(at: index, with: list)
         tblList.reloadData()
     }
-
+    
     func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
         return 40
     }

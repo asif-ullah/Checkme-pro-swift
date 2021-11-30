@@ -259,7 +259,9 @@ class MenuList : UIViewController,VTProCommunicateDelegate{
         }else if segue.identifier == "gotoVTDataListViewController" {
             let vc = segue.destination as? DataListView
             vc?.dataType = currNEModel!.event
-            vc?.userList =  userList as! NSArray
+            if userList != nil  {
+                vc?.userList =  userList as! NSArray
+            }
             if currNEModel!.event == 12 {
                 vc?.userList = xuserList as! NSArray
             }
